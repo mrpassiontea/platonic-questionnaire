@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Platonic Date Night - Questionnaire</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @keyframes starPulse {
+      0%, 100% { opacity: 0.3; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.2); }
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-10px); }
+    }
+    .star {
+      animation: starPulse 3s ease-in-out infinite;
+    }
+    .card-float {
+      animation: float 3s ease-in-out infinite;
+    }
+  </style>
+</head>
+<body class="bg-gradient-to-b from-indigo-950 via-purple-900 to-indigo-900 min-h-screen relative overflow-hidden">
+  
+  <!-- Stars Background -->
+  <div id="stars"></div>
+  
+  <!-- Main Content -->
+  <div id="app" class="relative z-10 container mx-auto px-4 py-8 max-w-2xl"></div>
+
+  <script>
+    // ============================================
+    // CONFIGURATION
+    // ============================================
+    const SUPABASE_URL = 'https://einhzgbxxrbrvuyzydmf.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVpbmh6Z2J4eHJicnZ1eXp5ZG1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk2ODAwMzgsImV4cCI6MjA3NTI1NjAzOH0.PQSvQ2hVEKZX7Ak8k3wTeTPCk-n8MMZW2uHkyLbhnbA';
+    
+    const { createClient } = supabase;
+    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY);
+    
+    // ============================================
+    // GET GAME CODE & PLAYER FROM URL
+    // ============================================
+    const urlParams = new URLSearchParams(window.location.search);
+    const gameCode = urlParams.get('code');
+    const playerType = urlParams.get('player'); // 'his' or 'her'
+    
+    // ============================================
+    // GENERATE STARS
+    // ============================================
+    const starsContainer = document.getElementById('stars');
+    for (let i = 0; i < 80; i++) {
+      const star = document.createElement('div');
+      star.className = 'star absolute rounded-full bg-white';
+      star.style.left = Math.random() * 100 + '%';
+      star.style.top = Math.random() * 100 + '%';
+      star.style.width = (Math.random() * 3 + 1) + 'px';
+      star.style.height = star.style.width;
+      star.style.animationDelay = Math.random() * 2 + 's';
+      starsContainer.appendChild(star);
+    }
+    
+    // ============================================
+    // STATE
+    // ============================================
+    let questions = [];
+    let answers = {};
+    let currentQuestionIndex = 0;
+    let gameId = null;
+    
+    // ============================================
+    // INIT
+    // ============================================
+    init();
+    
+    async function init() {
+      if (!gameCode || !playerType) {
+        renderError('Invalid link. Missing game code or player type.');
+        return;
+      }
+      
+      // Get game ID from code
+      const { data: game, error: gameError } = await supabaseClient
+        .from('games')
+        .select('id')
+        .eq('game_code', gameCode)
+        .single();
+      
+      if (gameError || !game) {
+        renderError('Game not found. Please check your link.');
+        return;
+      }
+      
+      gameId = game.id;
+      
+      // Load questions
+      const { data: questionsData, error: questionsError } = await supabaseClient
+        .from('questions')
+        .select('*')
+        .order('order_num');
+      
+      if (questionsError) {
+        renderError('Failed to load questions.');
+        return;
+      }
+      
+      questions = questionsData;
+      
+      // Initialize answers object
+      questions.forEach(q => answers[q.id] = '');
+      
+      renderQuestion();
+    }
+    
+    // ============================================
+    // RENDER QUESTION CARD
+    // ============================================
+    function renderQuestion() {
+      const app = document.getElementById('app');
+      const q = questions[currentQuestionIndex];
+      const isLastQuestion = currentQuestionIndex === questions.length - 1;
+      
+      app.innerHTML = `
+        <div class="card-float">
+          <!-- Tarot Card -->
+          <div class="bg-gradient-to-b from-purple-100 to-pink-50 rounded-lg p-1 shadow-2xl max-w-lg mx-auto">
+            <!-- Ornate border -->
+            <div class="relative bg-white rounded-lg p-8" style="border: 2px solid rgba(147, 51, 234, 0.3);">
+              <!-- Corner decorations -->
+              <div class="absolute top-3 left-3 text-purple-400 text-xl">✦</div>
+              <div class="absolute top-3 right-3 text-purple-400 text-xl">✦</div>
+              <div class="absolute bottom-3 left-3 text-purple-400 text-xl">✦</div>
+              <div class="absolute bottom-3 right-3 text-purple-400 text-xl">✦</div>
+              
+              <!-- Progress -->
+              <div class="text-center mb-6">
+                <p class="text-purple-400 text-sm">Question ${currentQuestionIndex + 1} of ${questions.length}</p>
+              </div>
+              
+              <!-- Question -->
+              <div class="text-center mb-8">
+                <h2 class="text-2xl font-bold text-purple-800 mb-4" style="font-family: Georgia, serif;">
+                  ${q.question_text}
+                </h2>
+              </div>
+              
+              <!-- Answer Input -->
+              <div class="mb-6">
+                <textarea
+                  id="answer-input"
+                  rows="5"
+                  class="w-full p-4 border-2 border-purple-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 text-purple-900"
+                  placeholder="Your answer..."
+                  style="font-family: Georgia, serif;"
+                >${answers[q.id] || ''}</textarea>
+              </div>
+              
+              <!-- Navigation -->
+              <div class="flex gap-3">
+                ${currentQuestionIndex > 0 ? `
+                  <button
+                    onclick="previousQuestion()"
+                    class="flex-1 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition"
+                  >
+                    ← Previous
+                  </button>
+                ` : ''}
+                
+                ${!isLastQuestion ? `
+                  <button
+                    onclick="nextQuestion()"
+                    class="flex-1 px-6 py-3 bg-pink-600 hover:bg-pink-700 text-white font-semibold rounded-lg transition"
+                  >
+                    Next →
+                  </button>
+                ` : `
+                  <button
+                    onclick="submitAnswers()"
+                    class="flex-1 px-6 py-3 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold rounded-lg transition"
+                  >
+                    Submit Answers ✨
+                  </button>
+                `}
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      // Focus input
+      setTimeout(() => {
+        document.getElementById('answer-input').focus();
+      }, 100);
+    }
+    
+    // ============================================
+    // NAVIGATION
+    // ============================================
+    function nextQuestion() {
+      saveCurrentAnswer();
+      if (currentQuestionIndex < questions.length - 1) {
+        currentQuestionIndex++;
+        renderQuestion();
+      }
+    }
+    
+    function previousQuestion() {
+      saveCurrentAnswer();
+      if (currentQuestionIndex > 0) {
+        currentQuestionIndex--;
+        renderQuestion();
+      }
+    }
+    
+    function saveCurrentAnswer() {
+      const q = questions[currentQuestionIndex];
+      const input = document.getElementById('answer-input');
+      answers[q.id] = input.value;
+    }
+    
+    // ============================================
+    // SUBMIT
+    // ============================================
+    async function submitAnswers() {
+      saveCurrentAnswer();
+      
+      // Validate all questions answered
+      const unanswered = questions.filter(q => !answers[q.id].trim());
+      if (unanswered.length > 0) {
+        alert(`Please answer all questions. ${unanswered.length} remaining.`);
+        return;
+      }
+      
+      // Prepare inserts
+      const answerInserts = questions.map(q => ({
+        game_id: gameId,
+        question_id: q.id,
+        player_type: playerType,
+        answer_text: answers[q.id]
+      }));
+      
+      // Insert to database
+      const { error } = await supabaseClient
+        .from('answers')
+        .insert(answerInserts);
+      
+      if (error) {
+        alert('Failed to submit answers. Please try again.');
+        console.error(error);
+        return;
+      }
+      
+      // Check if both submitted
+      const { data: allAnswers } = await supabaseClient
+        .from('answers')
+        .select('player_type')
+        .eq('game_id', gameId);
+      
+      const hasHis = allAnswers.some(a => a.player_type === 'his');
+      const hasHer = allAnswers.some(a => a.player_type === 'her');
+      
+      // Update game status if both done
+      if (hasHis && hasHer) {
+        await supabaseClient
+          .from('games')
+          .update({ status: 'ready' })
+          .eq('id', gameId);
+      }
+      
+      renderSuccess();
+    }
+    
+    // ============================================
+    // RENDER SUCCESS
+    // ============================================
+    function renderSuccess() {
+      const app = document.getElementById('app');
+      app.innerHTML = `
+        <div class="card-float">
+          <div class="bg-gradient-to-b from-purple-100 to-pink-50 rounded-lg p-8 shadow-2xl max-w-lg mx-auto text-center">
+            <div class="text-6xl mb-6">✨</div>
+            <h2 class="text-3xl font-bold text-purple-800 mb-4" style="font-family: Georgia, serif;">
+              All Done!
+            </h2>
+            <p class="text-purple-600 text-lg mb-6">
+              Your answers have been saved.
+            </p>
+            <p class="text-purple-500">
+              See you on date night! 💕
+            </p>
+          </div>
+        </div>
+      `;
+    }
+    
+    // ============================================
+    // RENDER ERROR
+    // ============================================
+    function renderError(message) {
+      const app = document.getElementById('app');
+      app.innerHTML = `
+        <div class="bg-red-100 border border-red-400 text-red-700 px-6 py-4 rounded-lg max-w-lg mx-auto">
+          <p class="font-bold">Error</p>
+          <p>${message}</p>
+        </div>
+      `;
+    }
+  </script>
+</body>
+</html>
